@@ -150,6 +150,11 @@ class StatCommands():
 
         json.dump(stats, open(self.stats_path, 'w'))
 
+    def AddServerStats(self, key, value):
+        stats = json.load(open(self.stats_path))
+        stats['server_stats'][key] += value
+        json.dump(stats, open(self.stats_path, 'w'))
+
 class Tools():
     def GetAllMembers(self):
         guild = variables.bot.get_guild(config.server_id)

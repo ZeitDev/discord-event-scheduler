@@ -2,6 +2,7 @@
 /.vscode
 /.scheduler
 config.py
+server_login.png
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

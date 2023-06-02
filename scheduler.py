@@ -8,6 +8,7 @@ from general import config
 from general import settings
 from general import variables
 from functions import stats
+from functions import background_tasks
 
 # Set timezone
 os.environ['TZ'] = 'UTC-2' # Winter Time: UTC-1, Summer Time: UTC-2
@@ -38,7 +39,7 @@ async def on_ready():
     if variables.first_startup:
         stats.Stats().CheckForExisitingStatsFile()
         stats.Stats().ResetUptime()
-        # TODO: _backgroundTasks.BackgroundTasks().initialize()
+        background_tasks.BackgroundTasks().init()
 
         variables.first_startup = False
 

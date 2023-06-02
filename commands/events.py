@@ -1,13 +1,14 @@
+import datetime
+
 from nextcord.ext import commands
 
 from general import settings
-
 from functions import events
 
 class Events(commands.Cog):
     @commands.command(usage='', aliases=['toggle'])
     async def ToggleEventCreation(self, ctx, *args):
-        "Stop the automatic event creation"
+        "Toggle the automatic event creation"
         await ctx.message.delete()
         settings.event_creation = not settings.event_creation
         await ctx.channel.send(f'Automatic event creation is now {"enabled" if settings.event_creation else "disabled"}', delete_after=30)
@@ -37,6 +38,11 @@ class Events(commands.Cog):
     async def test(self, ctx):
         await ctx.message.delete()
         await events.Events().InitEventCreation()
+
+    @commands.command()
+    async def check(self, ctx):
+        await ctx.message.delete()
+        await ctx.channel.send(f'Server time check: {datetime.datetime.now().strftime("%d.%m. %H:%M")}')
 
 def setup(bot):
     bot.add_cog(Events(bot))

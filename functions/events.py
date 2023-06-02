@@ -52,7 +52,7 @@ class Events():
         {event_title}
         missing votes: {num_of_members}/{num_of_members} | next reminder: none | event: {event_date.strftime('%d.%m.')}
         '''
-        embed = nextcord.Embed(description=description, color=Color.brand_green())
+        embed = nextcord.Embed(description=description, color=Color.dark_blue())
         return embed
 
     def InitEventLoop(self, EventData):
@@ -94,6 +94,7 @@ class EventTracking():
                 if event_time_reached:
                     await self.UpdatePenaltyStats(EventData, EventReactionData)
                     stats.StatCommands.AddConfirmedToLeaderboard(EventReactionData['members_confirmed'])
+                    await self.FinishEvent(EventData, EventReactionData)
                     return
                 
                 await asyncio.sleep(settings.update_interval)
@@ -185,8 +186,24 @@ class EventTracking():
         {event_title}
         missing votes: {num_members_missing}/{num_members} | {reminder_string} | Event: {EventData['date'].strftime('%d.%m.')}
         '''
-        embed = nextcord.Embed(description=description, color=Color.brand_green())
+        embed = nextcord.Embed(description=description, color=Color.dark_blue())
         await EventData['message'].edit(embed=embed)  
+
+    async def FinishEvent(self, EventData, EventReactionData):
+        members_confirmed = EventReactionData['members_confirmed']
+        members_canceled = EventReactionData['members_canceled']
+        members_missing = EventReactionData['members_missing']
+        members_uncertain = EventReactionData['members_uncertain']
+
+        event_title = EventData['event_title']
+
+        if len(members_confirmed) >= 5:
+            event_description = event_title + f' - findet statt \n Zusagen: {len(members_confirmed)}, Unsicher: {len(members_uncertain)}, Absagen: {len(members_canceled)}, Keine Antwort: {len(members_missing)}'
+            embed = nextcord.Embed(description=event_description, color=Color.brand_green())
+        else:
+            event_description = event_title + f' - findet nicht statt \n Zusagen: {len(members_confirmed)}, Unsicher: {len(members_uncertain)}, Absagen: {len(members_canceled)}, Keine Antwort: {len(members_missing)}'
+            embed = nextcord.Embed(description=event_description, color=Color.dark_red())
+        await EventData['message'].edit(embed=embed)
 
 class Checks():
     async def CheckForDeletion(self, message):
