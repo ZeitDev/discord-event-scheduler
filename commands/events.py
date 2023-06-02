@@ -2,6 +2,8 @@ from nextcord.ext import commands
 
 from general import settings
 
+from functions import events
+
 class Events(commands.Cog):
     @commands.command(usage='', aliases=['toggle'])
     async def ToggleEventCreation(self, ctx, *args):
@@ -9,6 +11,7 @@ class Events(commands.Cog):
         await ctx.message.delete()
         settings.event_creation = not settings.event_creation
         await ctx.channel.send(f'Automatic event creation is now {"enabled" if settings.event_creation else "disabled"}', delete_after=30)
+        events.test = 0
 
     @commands.command(usage='')
     async def SetEventTime(self, ctx, *args):
@@ -29,6 +32,11 @@ class Events(commands.Cog):
             await ctx.channel.send(f'Reminder time is now set to {settings.reminder_time}', delete_after=30)
         except:
             await ctx.channel.send(f'Invalid time format', delete_after=30)
+
+    @commands.command()
+    async def test(self, ctx):
+        await ctx.message.delete()
+        await events.Events().InitEventCreation()
 
 def setup(bot):
     bot.add_cog(Events(bot))
