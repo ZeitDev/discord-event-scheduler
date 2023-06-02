@@ -53,7 +53,7 @@ class Stats():
     def CreateEmbed(self):
         StatsDict = self.FormatStats()
 
-        embed = nextcord.Embed(title='Statistics', color=Color.dark_orange())
+        embed = nextcord.Embed(title='Statistics', color=Color.gold())
 
         embed.add_field(name='Time of others wasted', value=StatsDict['wasted_time_members'], inline=True)
         embed.add_field(name='\u200b', value=StatsDict['wasted_time_scores'], inline=True)
@@ -73,13 +73,13 @@ class Stats():
         return embed
     
     def FormatStats(self):
-        stats = json.load(self.stats_path)
+        stats = json.load(open(self.stats_path, 'r'))
 
         leaderboard_wasted_time = dict(sorted(stats['leaderboard_wasted_time'].items(), key=lambda item: item[1], reverse=True))
         leaderboard_reminder = dict(sorted(stats['leaderboard_reminder'].items(), key=lambda item: item[1], reverse=True))
         leaderboard_confirmed = dict(sorted(stats['leaderboard_confirmed'].items(), key=lambda item: item[1], reverse=True))
         server_stats = stats['server_stats']
-        member_displaynames = Tools().GetMemberDisplaynames()
+        member_displaynames = Tools().GetAllMemberDisplaynames()
 
         StatsDict = {
             'reminder_members': '',
@@ -115,7 +115,7 @@ class StatCommands():
         self.stats_path = os.path.join('data', 'stats.json')
 
     async def ShowStats(self, ctx):
-        embed = self.CreateEmbed()
+        embed = Stats().CreateEmbed()
         await ctx.send(embed=embed)
 
     def AddPenaltyToLeaderboard(self, members):
@@ -123,7 +123,7 @@ class StatCommands():
 
         for member in members:
             stats['leaderboard_reminder'][f'{member}'] += 1
-            stats['leaderboard_wasted_time'][f'{member}'] += settings.reminder_penalty
+            stats['leaderboard_wasted_time'][f'{member}'] += settings.penalty
 
         json.dump(stats, open(self.stats_path, 'w'))
 
@@ -150,7 +150,7 @@ class StatCommands():
 
         json.dump(stats, open(self.stats_path, 'w'))
 
-    def AddServerStats(self, key, value):
+    async def AddServerStats(self, key, value):
         stats = json.load(open(self.stats_path))
         stats['server_stats'][key] += value
         json.dump(stats, open(self.stats_path, 'w'))

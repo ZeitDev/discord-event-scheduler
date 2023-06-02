@@ -7,7 +7,7 @@ from functions import events
 
 class Events(commands.Cog):
     @commands.command(usage='', aliases=['toggle'])
-    async def ToggleEventCreation(self, ctx, *args):
+    async def ToggleEventCreation(self, ctx):
         "Toggle the automatic event creation"
         await ctx.message.delete()
         settings.event_creation = not settings.event_creation
@@ -36,13 +36,15 @@ class Events(commands.Cog):
 
     @commands.command()
     async def test(self, ctx):
+        "For testing purposes only. Do not use in running environment."
         await ctx.message.delete()
         await events.Events().InitEventCreation()
 
     @commands.command()
     async def check(self, ctx):
+        "Check the server time"
         await ctx.message.delete()
-        await ctx.channel.send(f'Server time check: {datetime.datetime.now().strftime("%d.%m. %H:%M")}')
+        await ctx.channel.send(f'Server time check: {datetime.datetime.now().strftime("%d.%m. %H:%M")}', delete_after=30)
 
 def setup(bot):
     bot.add_cog(Events(bot))

@@ -214,7 +214,7 @@ class Checks():
                 return 0
 
     async def CheckForEventConfirmation(self, EventData, EventReactionData):
-        if len(EventReactionData['members_confirmed']) >= 1:
+        if len(EventReactionData['members_confirmed']) >= 5:
             ConfirmedEventData = {'event_date': EventData['date'], 'members_confirmed': EventReactionData['members_confirmed']}
             variables.confirmed_events.append(ConfirmedEventData)
 
@@ -223,7 +223,7 @@ class Checks():
 
     def CheckForReminderTime(self, EventData):
         reminder_delta = Tools().TimeToNextReminder(EventData)
-        if reminder_delta == False: return False
+        if EventData['reminder_status'] == 2: return False
         if reminder_delta.total_seconds() <= 0: return True
 
     def CheckForEventTime(self, EventData):
@@ -256,7 +256,6 @@ class Tools():
         status = EventData['reminder_status']
         if status == 0: reminder_delta = timedelta(days=4)
         elif status == 1: reminder_delta = timedelta(days=1)
-        if status == 2: return False
 
         hour, minute = settings.reminder_time.split(':')
         reminder_date = (EventData['date'] - reminder_delta).replace(hour=int(hour), minute=int(minute), second=0)

@@ -1,6 +1,7 @@
 # Custom
 /.vscode
 /.scheduler
+*json
 config.py
 server_login.png
 

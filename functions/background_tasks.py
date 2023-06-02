@@ -28,7 +28,8 @@ class BackgroundTasks():
     async def AutomaticEventCreation(self):
         while True:
             if settings.event_creation:
-                if datetime.now().hour == 18 and self.triggered_for_day != datetime.today().weekday():
+                hour, _ = settings.event_creation_time.split(':')
+                if datetime.now().hour == int(hour) and self.triggered_for_day != datetime.today().weekday():
                     self.triggered_today = datetime.today().weekday()
                     await events.Events().InitEventCreation()
 
@@ -54,13 +55,12 @@ class BackgroundTasks():
     async def UpdateServerCost(self):
         while True:
             price = 60
-
             cost = (price/2628000) * 3600 # 60*60*24*30.42 (durchschnittliche Tage im Monat übers Jahr)
-            await stats.Stats().AddServerStats('server_cost', cost)
+            await stats.StatCommands().AddServerStats('server_cost', cost)
 
             await asyncio.sleep(3600)
 
     async def UpdateServerUptime(self):
         while True:
-            await stats.Stats().AddServerStats('uptime', 900)
+            await stats.StatCommands().AddServerStats('uptime', 900)
             await asyncio.sleep(900)
