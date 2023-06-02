@@ -159,7 +159,7 @@ class Tools():
     def GetAllMembers(self):
         guild = variables.bot.get_guild(config.server_id)
         for role in guild.roles:
-            if role.id == config.role_reminder:
+            if role.id == config.role_member:
                 return role.members
             
     def GetAllMemberDisplaynames(self):
