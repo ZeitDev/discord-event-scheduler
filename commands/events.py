@@ -38,7 +38,7 @@ class Events(commands.Cog):
     async def test(self, ctx):
         "For testing purposes only. Do not use in running environment."
         await ctx.message.delete()
-        await events.Events().InitEventCreation()
+        await events.Events().CreateEvent()
 
     @commands.command()
     async def check(self, ctx):

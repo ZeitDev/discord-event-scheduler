@@ -10,7 +10,7 @@ from functions import stats
 
 class BackgroundTasks():
     def __init__(self):
-        self.triggered_for_day = -1
+        self.last_triggered_day = -1
 
     def init(self):
         try:
@@ -29,9 +29,9 @@ class BackgroundTasks():
         while True:
             if settings.event_creation:
                 hour, _ = settings.event_creation_time.split(':')
-                if datetime.now().hour == int(hour) and self.triggered_for_day != datetime.today().weekday():
-                    self.triggered_today = datetime.today().weekday()
-                    await events.Events().InitEventCreation()
+                if datetime.now().hour == int(hour) and self.last_triggered_day != datetime.today().weekday():
+                    self.last_triggered_day = datetime.today().weekday()
+                    await events.Events().CreateEvent()
 
             await asyncio.sleep(settings.update_interval)
 

@@ -18,14 +18,12 @@ class Events():
     def __init__(self):
         self.channel = variables.bot.get_channel(config.channel_events)
 
-    async def InitEventCreation(self):
-        await self.channel.send(f'<@&{config.role_member}>')
-        await self.CreateEvent()
-
     async def CreateEvent(self):
-        event_date, event_day = self.GetEventDate()
+        await self.channel.send(f'<@&{config.role_member}>')
 
+        event_date, event_day = self.GetEventDate()
         event_title = event_date.strftime(f'{event_day} - %H:%M')
+
         embed = self.GetEmbed(event_date, event_title)
         message = await self.channel.send(embed=embed)
 
@@ -36,6 +34,7 @@ class Events():
             'confirmed': False,
             'reminder_status': 0
         }
+
         self.InitEventLoop(EventData)
 
     def GetEventDate(self):
