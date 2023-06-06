@@ -12,7 +12,7 @@ from functions import background_tasks
 
 # Set timezone
 os.environ['TZ'] = 'UTC-2' # Winter Time: UTC-1, Summer Time: UTC-2
-if not settings.is_debug: time.tzset()
+if not settings.debug: time.tzset()
 
 # Initialize bot
 description = '''Bot for scheduling group events with reactions and reminders.'''
@@ -40,11 +40,6 @@ async def on_ready():
         stats.Stats().CheckForExisitingStatsFile()
         stats.Stats().ResetUptime()
         background_tasks.BackgroundTasks().init()
-
         variables.first_startup = False
-
-    if settings.is_debug: 
-        from functions import events
-        await events.Events().CreateEvent()
 
 bot.run(config.bot_token)
