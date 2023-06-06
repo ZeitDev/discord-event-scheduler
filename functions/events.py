@@ -1,13 +1,8 @@
-# %%
 import time
 import emoji
 import asyncio
 from datetime import datetime, timedelta
 import nextcord
-
-from nextcord import Color
-
-# %%
 
 from general import config
 from general import settings
@@ -19,15 +14,16 @@ class Events():
         self.channel = variables.bot.get_channel(config.channel_events)
 
     async def CreateEvent(self):
-        await self.channel.send(f'<@&{config.role_member}>')
-
+        if not settings.event_time[datetime.today().weekday()]: return
+        
         event_date, event_day = self.GetEventDate()
         event_title = event_date.strftime(f'{event_day} - %H:%M')
-
-        embed = self.GetEmbed(event_date, event_title)
-        message = await self.channel.send(embed=embed)
+        
+        thread = await self.channel.create_thread(name=event_title, content='\u200b')
+        message = thread.last_message
 
         EventData = {
+            'thread': thread,
             'message': message,
             'title': event_title,
             'date': event_date,
@@ -38,48 +34,36 @@ class Events():
         self.InitEventLoop(EventData)
 
     def GetEventDate(self):
-        event_date = datetime.now() + timedelta(days = 7)
-        hour, minute = settings.event_time.split(':')
+        event_date = datetime.now() + timedelta(days = settings.days_to_event)
+        hour, minute = settings.event_time[event_date.weekday()].split(':')
         event_date = event_date.replace(hour=int(hour), minute=int(minute), second=0)
         event_day = Tools().TranslateWeekday(event_date.strftime('%A'))
         return event_date, event_day
-    
-    def GetEmbed(self, event_date, event_title):
-        num_of_members = len(Tools().GetAllMembers())
-
-        description = f'''
-        {event_title}
-        missing votes: {num_of_members}/{num_of_members} | next reminder: none | event: {event_date.strftime('%d.%m.')}
-        '''
-        embed = nextcord.Embed(description=description, color=Color.dark_blue())
-        return embed
 
     def InitEventLoop(self, EventData):
-        try:
-            loop = asyncio.get_event_loop()
-            asyncio.ensure_future(EventTracking().TrackEmbed(EventData))
-            loop.run_until_complete
-            loop.close()
-        except:
-            pass
+        loop = asyncio.get_event_loop()
+        asyncio.ensure_future(EventTracking().TrackThread(EventData))
+        loop.run_until_complete
 
 class EventTracking():
     def __init__(self):
+        self.members = Tools().GetAllMembers()
         self.uncertain_emojinames = ['pinching_hand', 'peeposus', 'didsomeonesay', 'hmmge']
         self.spontaneous_emojinames = ['shrugging', 'shrug']
         self.canceled_emojinames = ['thumbs_down', 'bedge', 'peepoNo', 'leave']
         self.notconfirmed_emojinames = self.uncertain_emojinames + self.spontaneous_emojinames + self.canceled_emojinames
 
-    async def TrackEmbed(self, EventData):
+    async def TrackThread(self, EventData):
         while True:
             try:
                 message = EventData['message']
                 message = await message.channel.fetch_message(message.id)
 
-                EventReactionData = await self.GetReactionData(message)
-                if EventReactionData == 0: break
+                check = await Checks().CheckForDeletion(EventData)
+                if check: break
 
-                if not EventData['confirmed']: await Checks().CheckForEventConfirmation(EventData, EventReactionData)
+                EventReactionData = await self.GetReactionData(message)
+                await self.UpdateThread(EventData, EventReactionData)
 
                 reminder_time_reached = Checks().CheckForReminderTime(EventData)
                 if reminder_time_reached:
@@ -87,14 +71,17 @@ class EventTracking():
                     await self.UpdatePenaltyStats(EventData, EventReactionData)
                     EventData['reminder_status'] += 1
 
-                await self.UpdateEmbed(EventData, EventReactionData)
-
-                event_time_reached = Checks().CheckForEventTime(EventData)
-                if event_time_reached:
-                    await self.UpdatePenaltyStats(EventData, EventReactionData)
-                    stats.StatCommands.AddConfirmedToLeaderboard(EventReactionData['members_confirmed'])
+                if not EventData['confirmed']: await Checks().CheckForEventConfirmation(EventData, EventReactionData)
+                check = Checks().CheckForAllMembersVoted(EventReactionData, self.members)
+                if check:
                     await self.FinishEvent(EventData, EventReactionData)
-                    return
+                    break
+
+                check = Checks().CheckForEventTime(EventData)
+                if check:
+                    await self.UpdatePenaltyStats(EventData, EventReactionData)
+                    await self.FinishEvent(EventData, EventReactionData)
+                    break
                 
                 await asyncio.sleep(settings.update_interval)
             except Exception as e:
@@ -102,9 +89,6 @@ class EventTracking():
                 await asyncio.sleep(settings.update_interval)
 
     async def GetReactionData(self, message):
-        check = await Checks().CheckForDeletion(message)
-        if check == 0: return check
-
         EventReactionData = {
             'members_reacted': [],
             'members_uncertain': [],
@@ -127,10 +111,7 @@ class EventTracking():
             if any(substring in emoji_name.lower() for substring in self.canceled_emojinames):
                 EventReactionData['members_canceled'].extend(await reaction.users().flatten())
 
-            if any(substring in emoji_name.lower() for substring in self.spontaneous_emojinames):
-                EventReactionData['members_spontaneous'].extend(await reaction.users().flatten())
-
-        EventReactionData['members_missing'] = [x for x in Tools().GetAllMembers() if x not in EventReactionData['members_reacted']]
+        EventReactionData['members_missing'] = [x for x in self.members if x not in EventReactionData['members_reacted']]
 
         return EventReactionData  
 
@@ -170,23 +151,20 @@ class EventTracking():
 
         stats.StatCommands().AddPenaltyToLeaderboard(members)
 
-    async def UpdateEmbed(self, EventData, EventReactionData):
-        event_title = EventData['title']
-        num_members = len(Tools().GetAllMembers())
+    async def UpdateThread(self, EventData, EventReactionData):
+        message = EventData['message']
+        emojis = [str(reaction.emoji) for reaction in message.reactions]
+        num_members = len(self.members)
         num_members_missing = len(EventReactionData['members_missing'])
 
         reminder_status = EventData['reminder_status']
         reminder_date = (datetime.now() + Tools().TimeToNextReminder(EventData)).strftime('%d.%m. - %H:%M')
         if reminder_status == 0: reminder_string = f'next reminder: {reminder_date}'
         elif reminder_status == 1: reminder_string = f'next reminder: {reminder_date}'
-        elif reminder_status == 2: reminder_string = 'next reminder: none'
+        elif reminder_status == 2: reminder_string = 'no reminder left'
 
-        description = f'''
-        {event_title}
-        missing votes: {num_members_missing}/{num_members} | {reminder_string} | Event: {EventData['date'].strftime('%d.%m.')}
-        '''
-        embed = nextcord.Embed(description=description, color=Color.dark_blue())
-        await EventData['message'].edit(embed=embed)  
+        content = f"{('  ').join(emojis)}\n| missing votes: {num_members_missing}/{num_members} | {reminder_string} | Event: {EventData['date'].strftime('%d.%m.')}"
+        await message.edit(content=content)        
 
     async def FinishEvent(self, EventData, EventReactionData):
         members_confirmed = EventReactionData['members_confirmed']
@@ -194,23 +172,25 @@ class EventTracking():
         members_missing = EventReactionData['members_missing']
         members_uncertain = EventReactionData['members_uncertain']
 
-        event_title = EventData['event_title']
+        if len(members_confirmed) >= 5: event_info = '✅ - findet statt'
+        else: event_info = '❌ - findet nicht statt'
 
-        if len(members_confirmed) >= 5:
-            event_description = event_title + f' - findet statt \n Zusagen: {len(members_confirmed)}, Unsicher: {len(members_uncertain)}, Absagen: {len(members_canceled)}, Keine Antwort: {len(members_missing)}'
-            embed = nextcord.Embed(description=event_description, color=Color.brand_green())
-        else:
-            event_description = event_title + f' - findet nicht statt \n Zusagen: {len(members_confirmed)}, Unsicher: {len(members_uncertain)}, Absagen: {len(members_canceled)}, Keine Antwort: {len(members_missing)}'
-            embed = nextcord.Embed(description=event_description, color=Color.dark_red())
-        await EventData['message'].edit(embed=embed)
+        content = f'{event_info}\n | Zusagen: {len(members_confirmed)}, Unsicher: {len(members_uncertain)}, Absagen: {len(members_canceled)}, Keine Antwort: {len(members_missing)}'
+        await EventData['message'].edit(content=content)
+
+        stats.StatCommands().AddConfirmedToLeaderboard(members_confirmed)
 
 class Checks():
-    async def CheckForDeletion(self, message):
+    async def CheckForDeletion(self, EventData):
+        message = EventData['message']
+        thread = EventData['thread']
         for reaction in message.reactions:
             if reaction.emoji == '❌':
-                embed = nextcord.Embed(description='Event deleted. Embed deleting itself in 15 seconds.', color=Color.dark_red())
-                await message.edit(embed=embed, delete_after=15)
-                return 0
+                await message.channel.send('Event canceled! Thread deleting itself in 15 seconds.')
+                await thread.edit(name = 'DELETED EVENT')
+                await asyncio.sleep(15)
+                await thread.delete()
+                return True
 
     async def CheckForEventConfirmation(self, EventData, EventReactionData):
         if len(EventReactionData['members_confirmed']) >= 5:
@@ -229,10 +209,10 @@ class Checks():
         delta_time = EventData['date'] - datetime.now()
         if delta_time.total_seconds() <= settings.event_finish: return True
 
-class Tools():
-    def __init__(self):
-        pass
+    def CheckForAllMembersVoted(self, EventReactionData, members):
+        return len(EventReactionData['members_reacted']) == len(members)
 
+class Tools():
     def GetAllMembers(self):
         guild = variables.bot.get_guild(config.server_id)
         for role in guild.roles:
@@ -253,8 +233,8 @@ class Tools():
 
     def TimeToNextReminder(self, EventData):
         status = EventData['reminder_status']
-        if status == 0: reminder_delta = timedelta(days=4)
-        elif status == 1: reminder_delta = timedelta(days=1)
+        if status == 0: reminder_delta = timedelta(days=settings.days_first_reminder)
+        elif status == 1: reminder_delta = timedelta(days=settings.days_second_reminder)
 
         hour, minute = settings.reminder_time.split(':')
         reminder_date = (EventData['date'] - reminder_delta).replace(hour=int(hour), minute=int(minute), second=0)

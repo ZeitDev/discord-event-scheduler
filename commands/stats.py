@@ -10,7 +10,7 @@ class Stats(commands.Cog):
         await ctx.message.delete()
         await stats.StatCommands().ShowStats(ctx)
 
-    @commands.command(usage='wasted 500 @User', aliases=['wasted', 'add'])
+    @commands.command(usage='500 @User', aliases=['wasted', 'add'])
     async def TimeWasted(self, ctx, *args):
         "Adds time to the wasted time account of a user"
         await stats.StatCommands().AddTimeToWastedTimeLeaderboard(ctx, args)

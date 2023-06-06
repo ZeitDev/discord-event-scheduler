@@ -14,17 +14,19 @@ class Events(commands.Cog):
         await ctx.channel.send(f'Automatic event creation is now {"enabled" if settings.event_creation else "disabled"}', delete_after=30)
         events.test = 0
 
-    @commands.command(usage='')
+    @commands.command(usage='weekday time', aliases=['event'])
     async def SetEventTime(self, ctx, *args):
         "Set the default time for event creation"
         await ctx.message.delete()
         try:
-            settings.event_time = args[0]
+            weekday = int(args[0])
+            if args[1] != 'False': settings.event_time[weekday] = args[1]
+            else : settings.event_time[weekday] = False
             await ctx.channel.send(f'Default event time is now set to {settings.event_time}', delete_after=30)
         except:
             await ctx.channel.send(f'Invalid time format', delete_after=30)
 
-    @commands.command(usage='')
+    @commands.command(usage='', aliases=['reminder'])
     async def SetReminderTime(self, ctx, *args):
         "Set the time for receiving reminders"
         await ctx.message.delete()
@@ -34,8 +36,8 @@ class Events(commands.Cog):
         except:
             await ctx.channel.send(f'Invalid time format', delete_after=30)
 
-    @commands.command()
-    async def test(self, ctx):
+    @commands.command(usage='', aliases=['test'])
+    async def create(self, ctx):
         "For testing purposes only. Do not use in running environment."
         await ctx.message.delete()
         await events.Events().CreateEvent()

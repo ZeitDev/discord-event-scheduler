@@ -43,4 +43,8 @@ async def on_ready():
 
         variables.first_startup = False
 
+    if settings.is_debug: 
+        from functions import events
+        await events.Events().CreateEvent()
+
 bot.run(config.bot_token)
