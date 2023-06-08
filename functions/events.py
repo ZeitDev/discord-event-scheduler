@@ -171,10 +171,10 @@ class EventTracking():
         members_missing = EventReactionData['members_missing']
         members_uncertain = EventReactionData['members_uncertain']
 
-        if len(members_confirmed) >= 5: event_info = '✅ - findet statt'
-        else: event_info = '❌ - findet nicht statt'
+        state_emoji = '✅' if len(members_confirmed) >= 5 else '❌'
+        await EventData['thread'].edit(name = f'{state_emoji} {EventData["title"]}')
 
-        content = f'{event_info}\n | Zusagen: {len(members_confirmed)}, Unsicher: {len(members_uncertain)}, Absagen: {len(members_canceled)}, Keine Antwort: {len(members_missing)}'
+        content = f'{state_emoji} | Zusagen: {len(members_confirmed)}, Unsicher: {len(members_uncertain)}, Absagen: {len(members_canceled)}, Keine Antwort: {len(members_missing)}'
         await EventData['message'].edit(content=content)
 
         stats.StatCommands().AddConfirmedToLeaderboard(members_confirmed)
