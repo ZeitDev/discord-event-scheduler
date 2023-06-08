@@ -14,10 +14,11 @@ class Events():
         self.channel = variables.bot.get_channel(config.channel_events)
 
     async def CreateEvent(self):
-        if not settings.event_time[datetime.today().weekday()]: return
+        event_date = datetime.now() + timedelta(days = settings.days_to_event)
+        if not settings.event_time[event_date.weekday()]: return
         
-        event_date, event_day = self.GetEventDate()
-        event_title = event_date.strftime(f'{event_day} - %H:%M')
+        event_date = self.FixEventTime(event_date)
+        event_title = event_date.strftime(f'{Tools().TranslateWeekday(event_date.strftime("%A"))} - %H:%M')
         
         thread = await self.channel.create_thread(name=event_title, content='\u200b')
         message = thread.last_message
@@ -33,12 +34,10 @@ class Events():
 
         self.InitEventLoop(EventData)
 
-    def GetEventDate(self):
-        event_date = datetime.now() + timedelta(days = settings.days_to_event)
+    def FixEventTime(self, event_date):
         hour, minute = settings.event_time[event_date.weekday()].split(':')
         event_date = event_date.replace(hour=int(hour), minute=int(minute), second=0)
-        event_day = Tools().TranslateWeekday(event_date.strftime('%A'))
-        return event_date, event_day
+        return event_date
 
     def InitEventLoop(self, EventData):
         loop = asyncio.get_event_loop()
@@ -113,7 +112,7 @@ class EventTracking():
 
         EventReactionData['members_missing'] = [x for x in self.members if x not in EventReactionData['members_reacted']]
 
-        return EventReactionData  
+        return EventReactionData
 
     async def SendEventConfirmation(self, EventData, EventReactionData):
         guild = variables.bot.get_guild(config.server_id)
@@ -210,7 +209,9 @@ class Checks():
         if delta_time.total_seconds() <= settings.event_finish: return True
 
     def CheckForAllMembersVoted(self, EventReactionData, members):
-        return len(EventReactionData['members_reacted']) == len(members)
+        all_voted = len(EventReactionData['members_reacted']) == len(members)
+        no_uncertains = len(EventReactionData['members_uncertain']) == 0
+        return all_voted and no_uncertains
 
 class Tools():
     def GetAllMembers(self):

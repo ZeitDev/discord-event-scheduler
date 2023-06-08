@@ -1,10 +1,10 @@
-debug = False
+debug = True
 
 prefix = '.'
 update_interval = 300
 
 event_creation = True
-event_time = ['18:30', '18:30', '18:30', '18:30', '18:30', False, False]
+event_time = ['19:00', '18:30', '18:30', '18:30', '18:30', False, False]
 event_creation_time = '20:00'
 event_finish = 900
 

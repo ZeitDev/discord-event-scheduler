@@ -20,7 +20,7 @@ class Events(commands.Cog):
         await ctx.message.delete()
         try:
             weekday = int(args[0])
-            if args[1] != 'False': settings.event_time[weekday] = args[1]
+            if args[1] != 'False': settings.event_time[weekday] = args[1].replace('"', '').replace("'", '')
             else : settings.event_time[weekday] = False
             await ctx.channel.send(f'Default event time is now set to {settings.event_time}', delete_after=30)
         except:

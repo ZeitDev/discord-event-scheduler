@@ -13,12 +13,8 @@ class Stats():
         self.stats_path = os.path.join('data', 'stats.json')
 
     def CheckForExisitingStatsFile(self):
-        try:
-            print('Loading stats.json')
-            json.load(open(self.stats_path))
-        except:
-            print('No stats found. Creating new one.')
-            self.CreateStatsFile()
+        try: json.load(open(self.stats_path))
+        except: self.CreateStatsFile()
 
     def ResetUptime(self):
         stats = json.load(open(self.stats_path))
@@ -44,9 +40,9 @@ class Stats():
         leaderboard_wasted_time = {}
         leaderboard_confirmed = {}
         for member in members:
-            leaderboard_reminder[f'{member}'] = 0
-            leaderboard_wasted_time[f'{member}'] = 0
-            leaderboard_confirmed[f'{member}'] = 0
+            leaderboard_reminder[str(member.id)] = 0
+            leaderboard_wasted_time[str(member.id)] = 0
+            leaderboard_confirmed[str(member.id)] = 0
 
         return leaderboard_reminder, leaderboard_wasted_time, leaderboard_confirmed
     
@@ -93,16 +89,16 @@ class Stats():
             'server_stats_values': '',
         }
 
-        for key, value in leaderboard_wasted_time.items():
-            StatsDict['wasted_time_members'] += (member_displaynames[key] + '\n')
+        for member_id, value in leaderboard_wasted_time.items():
+            StatsDict['wasted_time_members'] += (member_displaynames[member_id] + '\n')
             StatsDict['wasted_time_scores'] += (Tools().ConvertSecondsToReadable(value, skips=1) + '\n')
 
-        for key, value in leaderboard_reminder.items():
-            StatsDict['reminder_members'] += (member_displaynames[key] + '\n')
+        for member_id, value in leaderboard_reminder.items():
+            StatsDict['reminder_members'] += (member_displaynames[member_id] + '\n')
             StatsDict['reminder_scores'] += (str(value) + '\n')
 
-        for key, value in leaderboard_confirmed.items():
-            StatsDict['confirmed_members'] += (member_displaynames[key] + '\n')
+        for member_id, value in leaderboard_confirmed.items():
+            StatsDict['confirmed_members'] += (member_displaynames[member_id] + '\n')
             StatsDict['confirmed_scores'] += (str(value) + '\n')
 
         StatsDict['server_stats_titles'] = 'Starting Date' + '\n' 'Continuous uptime' + '\n' + 'Server Costs'
@@ -122,8 +118,8 @@ class StatCommands():
         stats = json.load(open(self.stats_path))
 
         for member in members:
-            stats['leaderboard_reminder'][f'{member}'] += 1
-            stats['leaderboard_wasted_time'][f'{member}'] += settings.penalty
+            stats['leaderboard_reminder'][str(member.id)] += 1
+            stats['leaderboard_wasted_time'][str(member.id)] += settings.penalty
 
         json.dump(stats, open(self.stats_path, 'w'))
 
@@ -137,7 +133,7 @@ class StatCommands():
             await ctx.channel.send(f'Error: arguments not valid. See .help wasted!')
             return
 
-        stats['leaderboard_wasted_time'][f'{member}'] += minutes * 60
+        stats['leaderboard_wasted_time'][str(member.id)] += minutes * 60
         await ctx.channel.send(f'Adding {minutes} minutes to {member.display_name}')
 
         json.dump(stats, open(self.stats_path, 'w'))
@@ -146,7 +142,7 @@ class StatCommands():
         stats = json.load(open(self.stats_path))
 
         for member in members:
-            stats['leaderboard_confirmed'][f'{member}'] += 1
+            stats['leaderboard_confirmed'][str(member.id)] += 1
 
         json.dump(stats, open(self.stats_path, 'w'))
 
@@ -166,7 +162,7 @@ class Tools():
         members = self.GetAllMembers()
         member_displaynames = {}
         for member in members:
-            member_displaynames[f'{member}'] = member.display_name
+            member_displaynames[str(member.id)] = member.display_name
 
         return member_displaynames
     
