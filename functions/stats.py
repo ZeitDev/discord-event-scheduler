@@ -23,7 +23,7 @@ class Stats():
 
     def CreateStatsFile(self):
         leaderboard_reminder, leaderboard_wasted_time, leaderboard_confirmed = self.CreateLeaderboards()
-        server_stats = {'starting_date': '02.06.2023', 'uptime': 0, 'server_cost': 0}
+        server_stats = {'starting_date': settings.starting_date, 'uptime': 0, 'server_cost': 0}
         
         stats = {
             'leaderboard_reminder': leaderboard_reminder,

@@ -14,7 +14,7 @@ class Events(commands.Cog):
         await ctx.channel.send(f'Automatic event creation is now {"enabled" if settings.event_creation else "disabled"}', delete_after=30)
         events.test = 0
 
-    @commands.command(usage='weekday time', aliases=['event'])
+    @commands.command(usage='weekday[int] time[string]', aliases=['event'])
     async def SetEventTime(self, ctx, *args):
         "Set the default time for event creation"
         await ctx.message.delete()
@@ -46,7 +46,7 @@ class Events(commands.Cog):
     async def check(self, ctx):
         "Check the server time"
         await ctx.message.delete()
-        await ctx.channel.send(f'Server time check: {datetime.datetime.now().strftime("%d.%m. %H:%M")}', delete_after=30)
+        await ctx.channel.send(f'Server time zone check: {datetime.datetime.now().strftime("%d.%m. %H:%M")}', delete_after=30)
 
 def setup(bot):
     bot.add_cog(Events(bot))
