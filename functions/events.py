@@ -57,11 +57,13 @@ class Events():
             if not thread:
                 Tools().PickleHandler('delete', uident)
                 continue
+
             if EventData['date'] > datetime.now():
                 print(f'INFO: loaded event "{EventData["title"]}"')
                 self.InitEventLoop(uident)
-            else:
-                Tools().PickleHandler('delete', uident)
+            else: Tools().PickleHandler('delete', uident)
+            
+            time.sleep(1)
 
 class EventTracking():
     def __init__(self):
@@ -74,9 +76,11 @@ class EventTracking():
     async def TrackThread(self, uident):
         while True:
             try:
-                if 'thread' not in locals():
+                if 'EventData' not in locals():
                     EventData = Tools().PickleHandler('load', uident)
                     thread = Events().channel.get_thread(EventData['thread_ID'])
+
+                initial_EventData = EventData
                 
                 message = await thread.fetch_message(thread.last_message_id)
 
@@ -102,6 +106,8 @@ class EventTracking():
                     await self.FinishEvent(EventData, EventReactionData, thread, message)
                     Tools().PickleHandler('delete', uident)
                     break
+                
+                if EventData != initial_EventData: Tools().PickleHandler('save', uident, EventData)
             
             except Exception as e:
                 print('LOOP ERROR:', e)
