@@ -8,10 +8,11 @@ from general import config
 from general import settings
 from general import variables
 from functions import stats
+from functions import events
 from functions import background_tasks
 
 # Set timezone
-os.environ['TZ'] = 'UTC-2' # Winter Time: UTC-1, Summer Time: UTC-2
+os.environ['TZ'] = settings.time_zone
 if not settings.debug: time.tzset()
 
 # Initialize bot
@@ -37,6 +38,7 @@ async def on_ready():
     print('-' * 45)
     await bot.change_presence(activity=nextcord.Activity(type=nextcord.ActivityType.watching, name=f'r1ct loosing'))
     if variables.first_startup:
+        events.Events().CheckForSavedEvents()
         stats.Stats().CheckForExisitingStatsFile()
         stats.Stats().ResetUptime()
         background_tasks.BackgroundTasks().init()

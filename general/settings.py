@@ -1,7 +1,10 @@
 debug = False
 
+time_zone = 'UTC-1' # Winter Time: UTC-1, Summer Time: UTC-2
+
 prefix = '.'
 update_interval = 300
+event_update_interval = 900
 
 event_creation = True
 event_time = ['18:30', '18:30', '18:30', '18:30', '18:30', False, False]
@@ -17,5 +20,7 @@ days_second_reminder = 1
 
 starting_date = '01.11.2023'
 
-if debug: update_interval = 5
+if debug:
+    update_interval = 5
+    event_update_interval = 5
 

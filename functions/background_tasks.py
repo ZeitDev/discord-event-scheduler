@@ -32,8 +32,10 @@ class BackgroundTasks():
         while True:
             if settings.event_creation:
                 hour, _ = settings.event_creation_time.split(':')
-                if datetime.now().hour == int(hour) and self.last_triggered_day != datetime.today().weekday():
-                    self.last_triggered_day = datetime.today().weekday()
+                current_weekday = datetime.today().weekday()
+                if datetime.now().hour == int(hour) and self.last_triggered_day != current_weekday:
+                    self.last_triggered_day = current_weekday
+                    await asyncio.sleep(current_weekday*30)
                     await events.Events().CreateEvent()
 
             await asyncio.sleep(settings.update_interval)
@@ -73,5 +75,5 @@ class BackgroundTasks():
 
     async def UpdateServerUptime(self):
         while True:
-            await stats.StatCommands().AddServerStats('uptime', 900)
-            await asyncio.sleep(900)
+            await stats.StatCommands().AddServerStats('uptime', 3600)
+            await asyncio.sleep(3600)
