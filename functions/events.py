@@ -148,13 +148,13 @@ class EventTracking():
         title = 'FlexQ'
         event_entity = nextcord.ScheduledEventEntityType.external
         event_metadata = nextcord.EntityMetadata(location='Summoners Rift')
-        event_start_time = EventData['date'] - timedelta(hours = 2)
+        event_start_time = EventData['date'] - timedelta(hours = int(settings.time_zone[-1]))
         event_end_time = EventData['date'] 
         event_description = ''
         for member in EventReactionData['members_confirmed']:
             event_description += member.display_name + ', '
 
-        await guild.create_scheduled_event(name=title, entity_type=event_entity ,start_time=event_start_time, metadata=event_metadata, end_time=event_end_time, description=event_description[:-2])
+        await guild.create_scheduled_event(name=title, entity_type=event_entity, start_time=event_start_time, metadata=event_metadata, end_time=event_end_time, description=event_description[:-2])
     
     async def SendReminder(self, EventData, EventReactionData):
         event_title = EventData['title']
@@ -200,7 +200,7 @@ class EventTracking():
         state_emoji = '✅' if len(members_confirmed) >= 5 else '❌'
         await thread.edit(name = f'{state_emoji} {EventData["title"]}')
 
-        content = f'{state_emoji} | confirmed: {len(members_confirmed)}, uncertain: {len(members_uncertain)}, canceled: {len(members_canceled)}, no answer: {len(members_missing)}'
+        content = f'confirmed: {len(members_confirmed)}, uncertain: {len(members_uncertain)}, canceled: {len(members_canceled)}, no answer: {len(members_missing)}'
         await message.edit(content=content)
 
         stats.StatCommands().AddConfirmedToLeaderboard(members_confirmed)
