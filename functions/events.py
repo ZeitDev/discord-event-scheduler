@@ -44,6 +44,7 @@ class Events():
         loop = asyncio.get_event_loop()
         asyncio.ensure_future(EventTracking().TrackThread(uident))
         loop.run_until_complete
+        variables.active_events += 1
 
     def CheckForSavedEvents(self):
         if not os.path.exists(os.path.join('data', 'events.pickle')):
@@ -96,15 +97,21 @@ class EventTracking():
                     await self.UpdatePenaltyStats(EventData, EventReactionData)
                     EventData['reminder_status'] += 1
 
-                if not EventData['confirmed']: await Checks().CheckForEventConfirmation(EventData, EventReactionData)
+                if not EventData['confirmed']: 
+                    check_confirmed = await Checks().CheckForEventConfirmation(EventData, EventReactionData)
+                    if check_confirmed: 
+                        EventData['confirmed'] = True
+                        await EventTracking().SendEventConfirmation(EventData, EventReactionData)
+                        await self.ConcludeEvent(EventData, EventReactionData, thread, message)
 
                 check_votes = Checks().CheckForMemberVotes(EventReactionData, self.members)
                 check_time = Checks().CheckForEventTime(EventData)
 
                 if check_votes or check_time:
                     if check_time: await self.UpdatePenaltyStats(EventData, EventReactionData)
-                    await self.FinishEvent(EventData, EventReactionData, thread, message)
+                    await self.ConcludeEvent(EventData, EventReactionData, thread, message)
                     Tools().PickleHandler('delete', uident)
+                    variables.active_events -= 1
                     break
                 
                 if EventData != initial_EventData: Tools().PickleHandler('save', uident, EventData)
@@ -191,16 +198,16 @@ class EventTracking():
         content = f"confirmed: {num_members_confirmed} | missing votes: {num_members_missing}/{num_members} | {reminder_string} | event date: {EventData['date'].strftime('%d.%m.')} |"
         await message.edit(content=content)
 
-    async def FinishEvent(self, EventData, EventReactionData, thread, message):
+    async def ConcludeEvent(self, EventData, EventReactionData, thread, message):
         members_confirmed = EventReactionData['members_confirmed']
         members_canceled = EventReactionData['members_canceled']
         members_missing = EventReactionData['members_missing']
         members_uncertain = EventReactionData['members_uncertain']
 
-        state_emoji = '✅' if len(members_confirmed) >= 5 else '❌'
+        state_emoji = '✅' if EventData['confirmed'] else '❌'
         await thread.edit(name = f'{state_emoji} {EventData["title"]}')
 
-        content = f'confirmed: {len(members_confirmed)}, uncertain: {len(members_uncertain)}, canceled: {len(members_canceled)}, no answer: {len(members_missing)}'
+        content = f'confirmed: {len(members_confirmed)} | uncertain: {len(members_uncertain)} | canceled: {len(members_canceled)} | no answer: {len(members_missing)} | confirm time: {datetime.now().strftime("%d.%m. - %H:00")} |'
         await message.edit(content=content)
 
         stats.StatCommands().AddConfirmedToLeaderboard(members_confirmed)
@@ -220,9 +227,6 @@ class Checks():
             ConfirmedEventData = {'event_date': EventData['date'], 'members_confirmed': EventReactionData['members_confirmed']}
             variables.confirmed_events.append(ConfirmedEventData)
 
-            EventData['confirmed'] = True
-            await EventTracking().SendEventConfirmation(EventData, EventReactionData)
-
     def CheckForReminderTime(self, EventData):
         reminder_delta = Tools().TimeToNextReminder(EventData)
         reminder_time_reached = reminder_delta.total_seconds() <= 0 and not EventData['reminder_status'] == 2
@@ -234,11 +238,11 @@ class Checks():
 
     def CheckForMemberVotes(self, EventReactionData, members):
         all_voted = len(EventReactionData['members_reacted']) == len(members)
-        no_uncertains = len(EventReactionData['members_uncertain']) == 0
 
+        no_uncertains = len(EventReactionData['members_uncertain']) == 0
         confirm_not_possible = (len(members)-len(EventReactionData['members_canceled'])) < 5
 
-        return (all_voted and no_uncertains) or confirm_not_possible
+        return all_voted and (no_uncertains or confirm_not_possible)
 
 class Tools():
     def FixEventTime(self, event_date):

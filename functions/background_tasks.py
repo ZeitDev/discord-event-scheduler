@@ -23,6 +23,9 @@ class BackgroundTasks():
 
             asyncio.ensure_future(BackgroundTasks().UpdateServerCost())
             asyncio.ensure_future(BackgroundTasks().UpdateServerUptime())
+
+            asyncio.ensure_future(BackgroundTasks().PrintInfoMessages())
+            
             loop.run_forever()
             loop.close()
         except:
@@ -77,3 +80,8 @@ class BackgroundTasks():
         while True:
             await stats.StatCommands().AddServerStats('uptime', 3600)
             await asyncio.sleep(3600)
+
+    async def PrintInfoMessages(self):
+        while True:
+            print(f'Active Events: {variables.active_events}')
+            await asyncio.sleep(86400)
