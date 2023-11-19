@@ -1,4 +1,4 @@
-debug = False
+debug = True
 
 time_zone = 'UTC-1' # Winter Time: UTC-1, Summer Time: UTC-2
 
@@ -6,11 +6,10 @@ prefix = '.'
 update_interval = 300
 event_update_interval = 900
 
-event_creation = True
-event_time = ['18:30', '18:30', '18:30', '18:30', '18:30', False, False]
-event_creation_time = '19:00'
+event_time = ['18:30', '18:30', '18:30', '18:30', '18:30']
 event_finish = 900
 
+reminders = True
 reminder_time = '20:00'
 penalty = 300
 
@@ -21,6 +20,6 @@ days_second_reminder = 1
 starting_date = '01.11.2023'
 
 if debug:
-    update_interval = 5
-    event_update_interval = 5
+    update_interval = 15
+    event_update_interval = 15
 

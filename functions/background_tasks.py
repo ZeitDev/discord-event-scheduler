@@ -17,7 +17,6 @@ class BackgroundTasks():
     def init(self):
         try:
             loop = asyncio.get_event_loop()
-            asyncio.ensure_future(BackgroundTasks().AutomaticEventCreation())
             asyncio.ensure_future(BackgroundTasks().AutomaticReport())
             asyncio.ensure_future(BackgroundTasks().StartingEventNotification())
 
@@ -30,18 +29,6 @@ class BackgroundTasks():
             loop.close()
         except:
             pass
-
-    async def AutomaticEventCreation(self):
-        while True:
-            if settings.event_creation:
-                hour, _ = settings.event_creation_time.split(':')
-                current_weekday = datetime.today().weekday()
-                if datetime.now().hour == int(hour) and self.last_triggered_day != current_weekday:
-                    self.last_triggered_day = current_weekday
-                    await asyncio.sleep(current_weekday*30)
-                    await events.Events().CreateEvent()
-
-            await asyncio.sleep(settings.update_interval)
 
     async def AutomaticReport(self):
         while True:

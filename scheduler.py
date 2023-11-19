@@ -38,7 +38,7 @@ async def on_ready():
     print('-' * 45)
     await bot.change_presence(activity=nextcord.Activity(type=nextcord.ActivityType.watching, name=f'r1ct loosing'))
     if variables.first_startup:
-        events.Events().CheckForSavedEvents()
+        await events.Events().CheckForExistingEvents()
         stats.Stats().CheckForExisitingStatsFile()
         stats.Stats().ResetUptime()
         background_tasks.BackgroundTasks().init()

@@ -18,113 +18,104 @@ class Events():
     def __init__(self):
         self.channel = variables.bot.get_channel(config.channel_events)
 
-    async def IniitializeEventEmbeds(self):
-        settings.reminders = False
-        for day in range(5):
-            event_embed = nextcord.Embed(title=day+1, description='\u200b')
-            event_message = await self.channel.send(embed=event_embed)
-
-            EventData = {
-                'embed': event_embed,
-                'message_id': event_message.id,
-                'date': None,
-                'confirmed': False,
-                'finished': False,
-                'reminder_status': 0
-            }
-
-            PickleHandler().Save(day, EventData)
-            await asyncio.sleep(2)
-            await self.CreateEvent(day)
-            await asyncio.sleep(2)
-        await variables.bot.get_channel(config.channel_notifications).send(f'<@&{config.role_member}>', delete_after=5)
-
-    async def CreateEvent(self, day):
-        AllEventData = PickleHandler().Load()
-        EventData = AllEventData[day]
-        message = await self.channel.fetch_message(EventData['message_id'])
-
-        delta_days = (day - datetime.now().weekday() + 7) % 7
-        event_date = datetime.now() + timedelta(days=delta_days)
-        event_date = Tools().FixEventTime(event_date)
-        EventData['date'] = event_date
-
-        title = event_date.strftime(f'{Tools().TranslateWeekday(event_date.strftime("%A"))} - %H:%M')
-        EventData['embed'].title = title
-        EventData['embed'].description = '\u200b'
-        await message.edit(embed=EventData['embed'])
+    async def CreateEvent(self):
+        event_date = datetime.now() + timedelta(days = settings.days_to_event) #DEBUG: datetime.now() + timedelta(minutes=2)
+        if not settings.event_time[event_date.weekday()]: return
         
-        PickleHandler().Save(day, EventData)
+        event_date = Tools().FixEventTime(event_date)
+        event_title = event_date.strftime(f'{Tools().TranslateWeekday(event_date.strftime("%A"))} - %H:%M')
+        
+        thread = await self.channel.create_thread(name=event_title, content='\u200b')
 
-        self.InitEventLoop(day)
+        EventData = {
+            'thread_ID': thread.id,
+            'title': event_title,
+            'date': event_date,
+            'confirmed': False,
+            'reminder_status': 0
+        }
 
-    def InitEventLoop(self, day):
+        uident = uuid.uuid4().hex
+        Tools().PickleHandler('save', uident, EventData)
+
+        self.InitEventLoop(uident)
+
+    def InitEventLoop(self, uident):
         loop = asyncio.get_event_loop()
-        asyncio.ensure_future(EventTracking().TrackEmbed(day))
+        asyncio.ensure_future(EventTracking().TrackThread(uident))
         loop.run_until_complete
         variables.active_events += 1
 
-    async def CheckForExistingEvents(self):
-        AllEventData = PickleHandler().Load()
-        if len(AllEventData) >= 5:
-            for day in range(5):
-                self.InitEventLoop(day)
-                await asyncio.sleep(2)
+    def CheckForSavedEvents(self):
+        if not os.path.exists(os.path.join('data', 'events.pickle')):
+            with open(os.path.join('data', 'events.pickle'), 'wb') as f:
+                pickle.dump({}, f)
+                
+        events = Tools().PickleHandler('load_all')
+
+        for uident, EventData in events.items():
+            thread = Events().channel.get_thread(EventData['thread_ID'])
+            if not thread:
+                Tools().PickleHandler('delete', uident)
+                continue
+
+            if EventData['date'] > datetime.now():
+                print(f'INFO: loaded event "{EventData["title"]}"')
+                self.InitEventLoop(uident)
+            else: Tools().PickleHandler('delete', uident)
+            
+            time.sleep(1)
 
 class EventTracking():
     def __init__(self):
         self.members = Tools().GetAllMembers()
-        self.channel_notifications = variables.bot.get_channel(config.channel_notifications)
-
         self.uncertain_emojinames = ['pinching_hand', 'peeposus', 'didsomeonesay', 'hmmge']
         self.spontaneous_emojinames = ['shrugging', 'shrug']
         self.canceled_emojinames = ['thumbs_down', 'bedge', 'peepoNo', 'leave']
         self.notconfirmed_emojinames = self.uncertain_emojinames + self.spontaneous_emojinames + self.canceled_emojinames
 
-    async def TrackEmbed(self, day):
+    async def TrackThread(self, uident):
         while True:
             try:
                 if 'EventData' not in locals():
-                    AllEventData = PickleHandler().Load()
-                    EventData = AllEventData[day]
-                
+                    EventData = Tools().PickleHandler('load', uident)
+                    thread = Events().channel.get_thread(EventData['thread_ID'])
+
                 initial_EventData = EventData
-                message = await Events().channel.fetch_message(EventData['message_id'])
+                
+                message = await thread.fetch_message(thread.last_message_id)
+
+                check_deletion = await Checks().CheckForDeletion(thread, message)
+                if check_deletion: break
 
                 EventReactionData = await self.GetReactionData(message)
-                await self.UpdateEmbed(EventData, EventReactionData, message)
+                await self.UpdateThread(EventData, EventReactionData, message)
 
                 reminder_time_reached = Checks().CheckForReminderTime(EventData)
                 if reminder_time_reached:
-                    if settings.reminders:
-                        await self.SendReminder(EventData, EventReactionData)
-                        await self.UpdatePenaltyStats(EventData, EventReactionData)
+                    await self.SendReminder(EventData, EventReactionData)
+                    await self.UpdatePenaltyStats(EventData, EventReactionData)
                     EventData['reminder_status'] += 1
 
-                if not EventData['confirmed']:
-                    check_confirmed = Checks().CheckForEventConfirmation(EventData, EventReactionData)
+                if not EventData['confirmed']: 
+                    check_confirmed = await Checks().CheckForEventConfirmation(EventData, EventReactionData)
                     if check_confirmed: 
                         EventData['confirmed'] = True
-                        await self.SendEventConfirmation(EventData, EventReactionData)
-                        await self.ConcludeEvent(EventData, EventReactionData, message)                
+                        await EventTracking().SendEventConfirmation(EventData, EventReactionData)
+                        await self.ConcludeEvent(EventData, EventReactionData, thread, message)
 
                 check_votes = Checks().CheckForMemberVotes(EventReactionData, self.members)
                 check_time = Checks().CheckForEventTime(EventData)
-                if (check_votes or check_time) and not EventData['finished']:
-                    EventData['finished'] = True
+
+                if check_votes or check_time:
                     if check_time: await self.UpdatePenaltyStats(EventData, EventReactionData)
-                    await self.ConcludeEvent(EventData, EventReactionData, message)
-
-                if check_time and EventData['finished']:
+                    await self.ConcludeEvent(EventData, EventReactionData, thread, message)
+                    Tools().PickleHandler('delete', uident)
                     variables.active_events -= 1
-                    self.ResetEvent(EventData, day, message)
-
-                    Events().CreateEvent(day)
-                    await self.channel_notifications.send(f'<@&{config.role_member}>', delete_after=5)
                     break
                 
-                if EventData != initial_EventData: PickleHandler().Save(day, EventData)
-
+                if EventData != initial_EventData: Tools().PickleHandler('save', uident, EventData)
+            
             except Exception as e:
                 print('LOOP ERROR:', e)
                 traceback.print_exc()
@@ -157,45 +148,6 @@ class EventTracking():
         EventReactionData['members_missing'] = [x for x in self.members if x not in EventReactionData['members_reacted']]
 
         return EventReactionData
-    
-    async def UpdateEmbed(self, EventData, EventReactionData, message):
-        num_members = len(self.members)
-        num_members_confirmed = len(EventReactionData['members_confirmed'])
-        num_members_missing = len(EventReactionData['members_missing'])
-
-        reminder_status = EventData['reminder_status']
-        reminder_date = (datetime.now() + Tools().TimeToNextReminder(EventData))
-        reminder_date_string = reminder_date.strftime(f'{Tools().TranslateWeekday(reminder_date.strftime("%A"), short=True)} - %H:%M')
-
-        if reminder_status == 0: reminder_string = f'next reminder: {reminder_date_string}'
-        elif reminder_status == 1: reminder_string = f'next reminder (+ uncertains): {reminder_date_string}'
-        elif reminder_status == 2: reminder_string = 'no reminder left'
-
-        description = f"confirmed: {num_members_confirmed} | missing: {num_members_missing}/{num_members} | {reminder_string} | date: {EventData['date'].strftime('%d.%m.')}"
-        EventData['embed'].description = description
-        await message.edit(embed=EventData['embed'])
-
-    async def SendReminder(self, EventData, EventReactionData):
-        event_title = EventData['embed'].title
-        
-        
-        if EventData['reminder_status'] == 0:
-            members = EventReactionData['members_missing']
-        elif EventData['reminder_status'] == 1:
-            members = EventReactionData['members_missing'] + EventReactionData['members_uncertain']
-
-        for member in members:
-            message = Tools().GetReminderMessage(member, event_title)
-            if not member.bot: 
-                await self.channel_notifications.send(message)
-                await asyncio.sleep(5)
-
-    async def UpdatePenaltyStats(self, EventData, EventReactionData):
-        status = EventData['reminder_status']
-        if status == 0: members = EventReactionData['members_missing']
-        elif status in [1, 2]: members = EventReactionData['members_missing'] + EventReactionData['members_uncertain']
-
-        stats.StatCommands().AddPenaltyToLeaderboard(members)
 
     async def SendEventConfirmation(self, EventData, EventReactionData):
         guild = variables.bot.get_guild(config.server_id)
@@ -204,46 +156,85 @@ class EventTracking():
         event_entity = nextcord.ScheduledEventEntityType.external
         event_metadata = nextcord.EntityMetadata(location='Summoners Rift')
         event_start_time = EventData['date'] - timedelta(hours = int(settings.time_zone[-1]))
-        event_end_time = EventData['date']
+        event_end_time = EventData['date'] 
         event_description = ''
         for member in EventReactionData['members_confirmed']:
             event_description += member.display_name + ', '
 
         await guild.create_scheduled_event(name=title, entity_type=event_entity, start_time=event_start_time, metadata=event_metadata, end_time=event_end_time, description=event_description[:-2])
     
-    async def ConcludeEvent(self, EventData, EventReactionData, message):
+    async def SendReminder(self, EventData, EventReactionData):
+        event_title = EventData['title']
+        channel_notifications = variables.bot.get_channel(config.channel_notifications)
+        
+        if EventData['reminder_status'] == 0:
+            members = EventReactionData['members_missing']
+        elif EventData['reminder_status'] == 1:
+            members = EventReactionData['members_missing'] + EventReactionData['members_uncertain']
+
+        for member in members:
+            message = Tools().GetReminderMessage(member, event_title)
+            if not member.bot: await channel_notifications.send(message)
+            await asyncio.sleep(10)
+
+    async def UpdatePenaltyStats(self, EventData, EventReactionData):
+        status = EventData['reminder_status']
+        if status == 0: members = EventReactionData['members_missing']
+        elif status in [1, 2]: members = EventReactionData['members_missing'] + EventReactionData['members_uncertain']
+
+        stats.StatCommands().AddPenaltyToLeaderboard(members)
+
+    async def UpdateThread(self, EventData, EventReactionData, message):
+        num_members = len(self.members)
+        num_members_confirmed = len(EventReactionData['members_confirmed'])
+        num_members_missing = len(EventReactionData['members_missing'])
+
+        reminder_status = EventData['reminder_status']
+        reminder_date = (datetime.now() + Tools().TimeToNextReminder(EventData)).strftime('%d.%m. - %H:%M')
+        if reminder_status == 0: reminder_string = f'next reminder (missings): {reminder_date}'
+        elif reminder_status == 1: reminder_string = f'next reminder (missings + uncertains): {reminder_date}'
+        elif reminder_status == 2: reminder_string = 'no reminder left'
+
+        content = f"confirmed: {num_members_confirmed} | missing votes: {num_members_missing}/{num_members} | {reminder_string} | event date: {EventData['date'].strftime('%d.%m.')} |"
+        await message.edit(content=content)
+
+    async def ConcludeEvent(self, EventData, EventReactionData, thread, message):
         members_confirmed = EventReactionData['members_confirmed']
         members_canceled = EventReactionData['members_canceled']
         members_missing = EventReactionData['members_missing']
         members_uncertain = EventReactionData['members_uncertain']
 
-        state_emoji = '✅' if len(members_confirmed) >= 5 else '❌'
-        EventData["embed"].title = f'{state_emoji} {EventData["embed"].title}'
-        EventData["embed"].description = f'confirmed: {len(members_confirmed)} | uncertain: {len(members_uncertain)} | canceled: {len(members_canceled)} | no answer: {len(members_missing)} | confirm time: {datetime.now().strftime("%d.%m. - %H:00")} |'
-        await message.edit(embed=EventData['embed'])
+        state_emoji = '✅' if EventData['confirmed'] else '❌'
+        await thread.edit(name = f'{state_emoji} {EventData["title"]}')
+
+        content = f'confirmed: {len(members_confirmed)} | uncertain: {len(members_uncertain)} | canceled: {len(members_canceled)} | no answer: {len(members_missing)} | confirm time: {datetime.now().strftime("%d.%m. - %H:00")} |'
+        await message.edit(content=content)
 
         stats.StatCommands().AddConfirmedToLeaderboard(members_confirmed)
 
-    def ResetEvent(self, EventData, day, message):
-        for reaction in message.reactions:
-            reaction.clear()
-
-        EventData['date'] = None
-        EventData['confirmed'] = False
-        EventData['finished'] = False
-        EventData['reminder_status'] = 0
-        PickleHandler().Save(day, EventData)
-
 class Checks():
+    async def CheckForDeletion(self, thread, message):
+        for reaction in message.reactions:
+            if reaction.emoji == '❌':
+                await message.channel.send('Event canceled! Thread deleting itself in 15 seconds.')
+                await thread.edit(name = 'DELETED EVENT')
+                await asyncio.sleep(15)
+                await thread.delete()
+                return True
+
+    async def CheckForEventConfirmation(self, EventData, EventReactionData):
+        if len(EventReactionData['members_confirmed']) >= 5:
+            ConfirmedEventData = {'event_date': EventData['date'], 'members_confirmed': EventReactionData['members_confirmed']}
+            variables.confirmed_events.append(ConfirmedEventData)
+
     def CheckForReminderTime(self, EventData):
         reminder_delta = Tools().TimeToNextReminder(EventData)
         reminder_time_reached = reminder_delta.total_seconds() <= 0 and not EventData['reminder_status'] == 2
         return reminder_time_reached
-    
-    def CheckForEventConfirmation(self, EventData, EventReactionData):
-        if len(EventReactionData['members_confirmed']) >= 5:
-            ConfirmedEventData = {'event_date': EventData['date'], 'members_confirmed': EventReactionData['members_confirmed']}
-            variables.confirmed_events.append(ConfirmedEventData)
+
+    def CheckForEventTime(self, EventData):
+        delta_time = EventData['date'] - datetime.now()
+        if delta_time.total_seconds() <= settings.event_finish: return True
 
     def CheckForMemberVotes(self, EventReactionData, members):
         all_voted = len(EventReactionData['members_reacted']) == len(members)
@@ -252,10 +243,6 @@ class Checks():
         confirm_not_possible = (len(members)-len(EventReactionData['members_canceled'])) < 5
 
         return all_voted and (no_uncertains or confirm_not_possible)
-    
-    def CheckForEventTime(self, EventData):
-        delta_time = EventData['date'] - datetime.now()
-        if delta_time.total_seconds() <= settings.event_finish: return True
 
 class Tools():
     def FixEventTime(self, event_date):
@@ -269,29 +256,17 @@ class Tools():
             if role.id == config.role_reminder:
                 return role.members
             
-    def TranslateWeekday(self, weekday, short=False):
-        if short:
-            switcher = {
-                'Monday': 'Mo',
-                'Tuesday': 'Di',
-                'Wednesday': 'Mi',
-                'Thursday': 'Do',
-                'Friday': 'Fr',
-                'Saturday': 'Sa',
-                'Sunday': 'So',
-            }
-            return switcher.get(weekday, 'Invalid Weekday')
-        else:
-            switcher = {
-                'Monday': 'Montag',
-                'Tuesday': 'Dienstag',
-                'Wednesday': 'Mittwoch',
-                'Thursday': 'Donnerstag',
-                'Friday': 'Freitag',
-                'Saturday': 'Samstag',
-                'Sunday': 'Sonntag',
-            }
-            return switcher.get(weekday, 'Invalid Weekday')
+    def TranslateWeekday(self, weekday):
+        switcher = {
+            'Monday': 'Montag',
+            'Tuesday': 'Dienstag',
+            'Wednesday': 'Mittwoch',
+            'Thursday': 'Donnerstag',
+            'Friday': 'Freitag',
+            'Saturday': 'Samstag',
+            'Sunday': 'Sonntag',
+        }
+        return switcher.get(weekday, 'Invalid Weekday')
 
     def TimeToNextReminder(self, EventData):
         status = EventData['reminder_status']
@@ -303,6 +278,38 @@ class Tools():
         reminder_date = (EventData['date'] - reminder_delta).replace(hour=int(hour), minute=int(minute), second=0)
         delta_time = reminder_date - datetime.now()
         return delta_time
+    
+    def PickleHandler(self, command, uident=None, event=None):
+        events_path = os.path.join('data', 'events.pickle')
+
+        if command == 'save':
+            events = self.LoadPickle()
+            with open(events_path, 'wb') as f:
+                events[uident] = event
+                pickle.dump(events, f)
+
+        elif command == 'load':
+            with open(events_path, 'rb') as f:
+                events = pickle.load(f)
+                return events[uident]
+            
+        elif command == 'load_all':
+            with open(events_path, 'rb') as f:
+                events = pickle.load(f)
+                return events
+            
+        elif command == 'delete':
+            events = self.LoadPickle()
+            with open(events_path, 'wb') as f:
+                del events[uident]
+                if len(events) != 0:
+                    pickle.dump(events, f)
+                else:
+                    pickle.dump({}, f)
+                
+    def LoadPickle(self):
+        with open(os.path.join('data', 'events.pickle'), 'rb') as f:
+            return pickle.load(f)
 
     def GetReminderMessage(self, member, event_title):
         messages = [
@@ -387,22 +394,3 @@ class Tools():
         ]
 
         return random.choice(messages)
-    
-class PickleHandler():
-    def __init__(self):
-        self.events_path = os.path.join('data', 'events.pickle')
-
-    def Load(self):
-        if os.path.exists(self.events_path):
-            with open(self.events_path, 'rb') as f:
-                return pickle.load(f)
-        else:
-            with open(self.events_path, 'wb') as f:
-                pickle.dump({}, f)
-                return {}
-
-    def Save(self, index, event):
-        events = self.Load()
-        with open(self.events_path, 'wb') as f:
-            events[index] = event
-            pickle.dump(events, f)

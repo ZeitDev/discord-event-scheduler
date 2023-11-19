@@ -6,13 +6,18 @@ from general import settings
 from functions import events
 
 class Events(commands.Cog):
+    @commands.command(usage='', aliases=['init', 'initialize'])
+    async def InitializeEventEmbeds(self, ctx):
+        "Initialize event channel embeds"
+        await ctx.message.delete()
+        await events.Events().IniitializeEventEmbeds()
+
     @commands.command(usage='', aliases=['toggle'])
-    async def ToggleEventCreation(self, ctx):
+    async def ToggleReminder(self, ctx):
         "Toggle the automatic event creation"
         await ctx.message.delete()
-        settings.event_creation = not settings.event_creation
-        await ctx.channel.send(f'Automatic event creation is now {"enabled" if settings.event_creation else "disabled"}', delete_after=30)
-        events.test = 0
+        settings.reminders = not settings.reminders
+        await ctx.channel.send(f'Reminders are now {"enabled" if settings.reminders else "disabled"}', delete_after=30)
 
     @commands.command(usage='weekday[int] time[string]', aliases=['event'])
     async def SetEventTime(self, ctx, *args):
